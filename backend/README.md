@@ -1,175 +1,129 @@
 # TutorBot — Backend
 
-This repository contains the backend for "TutorBot" — a Spring Boot application that provides user authentication, course/topic management, PDF ingestion and RAG-style retrieval with embeddings.
+This repository contains the backend for the TutorBot application — a Spring Boot service that provides user management, course/topic management, PDF ingestion and retrieval-augmented generation (RAG) using embeddings.
 
-This README explains how to run the backend locally, configure environment variables, run tests and troubleshoot common issues.
+This README is a documentation-focused overview of the backend: what it contains, how it is organized, the main responsibilities of components, design decisions and where to look in the code. It intentionally omits step-by-step run instructions (those belong in a CONTRIBUTING or RUNNING document).
 
----
+Table of contents
+- Project purpose
+- High-level architecture
+- Important packages & responsibilities
+- Data stores & persistence
+- Authentication & authorization
+- RAG / Embeddings and ingestion
+- Key design decisions and trade-offs
+- Testing, CI and environment notes
+- Where to look for specific features
+- Contribution & license
 
-## Quick overview
+## Project purpose
 
-- Stack: Java + Spring Boot
-- Build: Maven wrapper (mvnw / mvnw.cmd)
-- Persistent stores: Postgres (for relational data) and MongoDB (used in parts of the project)
-- AI / RAG: langchain4j integrations, embedding stores (pgvector, etc.)
-- Auth: session-based authentication (login endpoint stores Authentication in HTTP session, JSESSIONID cookie used by clients)
+TutorBot is intended as an AI-powered tutor backend. It supports:
+- User registration, authentication and session-based authorization
+- Management of courses, topics and course materials
+- Uploading and ingesting PDF documents into an embedding store
+- Retrieval-augmented generation (RAG) workflows to answer or summarize using retrieved document segments
 
-Project layout (important packages):
-- `ch.frupp.lecturevault.auth` — security, authentication provider, user details
-- `ch.frupp.lecturevault.user` — user model, controller, service, repository
-- `ch.frupp.lecturevault.course` — courses, materials, upload endpoints
-- `ch.frupp.lecturevault.ai` — AI assistant, configuration for RAG, embeddings
-- `src/test` — unit tests
+## High-level architecture
 
----
+- Spring Boot application (Java)
+- Modular code organized by domain (auth, user, course, topic, ai)
+- Session-based security (server-side sessions and JSESSIONID cookie)
+- A RAG pipeline that creates embeddings for document segments and stores them in a persistent embedding store
+- An AiAssistant abstraction that wraps the LLM interactions and prompt templates
 
-## Requirements
+## Important packages & responsibilities
 
-- Java 17+ (use the version required by the project's `pom.xml`)
-- Docker & Docker Compose (recommended to run Postgres locally via `compose.yaml`)
-- A valid API key for the chosen LLM provider (don't commit it) — configure via environment variables or `.env`
+- `ch.frupp.tutorbot.auth`
+  - Security wiring: custom `AuthenticationProvider`, `CustomUserDetailsService` and `SecurityConfig` (Spring Security configuration)
+  - Responsible for authentication, user lookup, and integrating with Spring Security's session management
 
+- `ch.frupp.tutorbot.user`
+  - User entity, DTOs, repository and controller
+  - Registration, login and logout endpoints live here
 
-## Running locally
+- `ch.frupp.tutorbot.course`
+  - Course entities, controllers and services
+  - Course materials (uploading PDFs, linking to courses and users) and endpoints for course-specific operations
 
-### 1) Using Maven wrapper (Windows PowerShell)
+- `ch.frupp.tutorbot.course.material` (or subpackage)
+  - Logic for handling uploaded files, ingestion into the embedding store, and material metadata mapping
 
-Open PowerShell in project root and run:
+- `ch.frupp.tutorbot.course.topic`
+  - Topic entity, DTO and business logic for topic creation, summaries and associations with quizzes
 
-```powershell
-# run the app
-.\mvnw.cmd spring-boot:run
+- `ch.frupp.tutorbot.ai`
+  - `AiAssistant` interfaces and configuration (`RAGConfiguration`, `AiAssistantConfig`)
+  - Responsible for assembly of retrieval pipelines, prompt templates and LLM calls
 
-# run tests
-.\mvnw.cmd test
+## Data stores & persistence
 
-# build a jar
-.\mvnw.cmd -DskipTests package
-```
+This project uses multiple persistence layers depending on the data type:
 
-On Unix/macOS use `./mvnw` the same way.
+- Relational DB (Postgres)
+  - Used for relational data and for persistent embedding stores (`pgvector`) when configured
+  - Spring Data JPA repositories map Java entities to relational tables
+  - DDL and migration considerations: any non-standard DDL (extensions like `pgvector`) must be available on the Postgres instance
 
-### 2) Using Docker Compose
+- MongoDB
+  - Used in parts of the project where document-style models are convenient
+  - Spring Data MongoDB repositories map `@Document` classes to collections
 
-If you want to run the Postgres (and other infrastructure) alongside the app, use the provided `compose.yaml`:
+- Embedding stores
+  - Persistent options include `pgvector` (Postgres), and other stores supported by langchain4j. The embedding store choice impacts persistence and retrieval capabilities.
 
-```powershell
-# from project root
-docker compose -f compose.yaml up --build
-```
+Notes on Spring Data repositories
+- Spring Data provides repository interfaces (JPA or MongoDB) which Spring will implement at runtime. The mapping only happens if the respective Spring Data starter is on the classpath and configured (for example, `spring-boot-starter-data-mongodb` for MongoDB). If both drivers are present, both repository types may be active.
+- There is no magic: Spring does not automatically wire unrelated DBs unless their auto-configuration is enabled via dependencies and application configuration.
 
-This will start the database containers. The backend can be started with `mvnw` afterwards or packaged into a Docker image.
+## Authentication & authorization
 
-### 3) Running the packaged jar
+- The backend uses session-based authentication. When a user successfully authenticates, an Authentication object is stored in the HTTP session and a JSESSIONID cookie is issued to the client.
+- The project uses a custom `UserAuthenticationProvider` and a `CustomUserDetailsService` to load users from the configured user repository.
+- Security-related classes and beans are centralized in the `auth` package. Be cautious when defining beans (e.g. converting `@Component` to a `@Bean` in a configuration class) to avoid circular dependencies or duplicate bean registration.
 
-```powershell
-# after building
-java -jar target/*.jar
-```
+## RAG / Embeddings and ingestion
 
----
+- The ingestion pipeline reads PDFs (or other supported formats), splits them into segments and creates embeddings per segment. Each embedding is stored with metadata including `userId` and `courseId` to enable scoped retrieval later.
+- Document splitting strategy (paragraph-based splitting) is implemented in the ingestion service. The splitting strategy matters for retrieval granularity and prompt size.
+- The embedding store should be persistent to avoid re-ingesting documents on every startup. Supported persistent stores include Postgres with `pgvector` and other backends supported by langchain4j.
+- When retrieving context for a user query, the retrieval pipeline should filter by metadata (for example `userId` and `courseId`) so only the relevant segments are considered.
 
-## Configuration and secrets
+## Key design decisions and trade-offs
 
-This project uses Spring Boot's configuration. Do NOT commit API keys or secrets.
+- Session-based auth (server-side) vs stateless tokens (JWT)
+  - The project currently prefers session-based authentication (server-managed sessions and cookies). This avoids storing tokens on the client but requires session storage on the server and correct handling of security context saving after programmatic authentication.
 
-A recommended approach is to keep local secrets in a `.env` file and import it from `application.properties`:
+- Persisting documents vs persisting embeddings
+  - Persisting embeddings allows skipping repeated ingestion. Persisting raw documents makes re-processing possible (e.g., to change splitting or embedding model).
+  - Typical approach: persist embeddings and keep raw documents if you need to reprocess; otherwise store only embeddings and minimal provenance metadata (uploader, course, original filename).
 
-```
-# in application.properties
-spring.config.import=file:.env[.properties]
-```
+- MongoDB embedded documents vs references
+  - Embedding a full sub-document (`List<Quiz>`) inside a Topic document is convenient for fast reads and denormalized views but duplicates data.
+  - Storing references (IDs) is normalized and avoids duplication; choosing between them depends on query patterns and update/delete semantics. If you want cascade deletes (delete quizzes when a topic is deleted), an explicit application-level delete or database-level cascading (supported in relational DBs) is needed.
 
-Example `.env` entries (DO NOT CHECK IN TO GIT):
+## Testing, CI and environment notes
 
-```
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/tutorbot
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=postgres
-SPRING_DATA_MONGODB_URI=mongodb://localhost:27017/tutorbotdb
-GEMINI_API_KEY=your_gemini_api_key_here
-OLLAMA_URL=http://localhost:11434
-```
+- Unit and integration tests should be isolated: create and tear down any required users/data in tests or use `@WithMockUser` where appropriate.
+- Avoid hardcoding third-party API keys in the repository. Use environment variables or external configuration for secrets. The codebase already contains support to configure different LLM providers via properties.
 
-The app reads `application.properties` in `src/main/resources`. If you want to switch between LLM providers for development, comment/uncomment the relevant provider blocks in `application.properties` (the project already contains commented instructions to switch to Ollama for local testing).
+## Where to look for specific features
 
----
+- Authentication: `src/main/java/ch/frupp/tutorbot/auth`
+- User endpoints: `src/main/java/ch/frupp/tutorbot/user`
+- Course endpoints & material ingestion: `src/main/java/ch/frupp/tutorbot/course`
+- Topics: `src/main/java/ch/frupp/tutorbot/course/topic`
+- AI / RAG wiring: `src/main/java/ch/frupp/tutorbot/ai`
+- Tests: `src/test/java`
 
-## API overview
+## Contribution & license
 
-Important endpoints (subject to code changes in controllers):
+- This README is documentation-only. If you want to add run or contribution instructions, add a separate `CONTRIBUTING.md` or `RUNNING.md` so this file remains focused on project documentation.
+- Add your license identifier and contribution guidelines before publishing the repository publicly.
 
-- `POST /api/users/register` — register a new user (body: registration data)
-- `POST /api/users/login` — login with username/password; stores Authentication in HTTP session and returns logged-in info
-- `POST /api/users/logout` — logout endpoint (invalidates session)
-- `GET /api/courses` — list courses for authenticated user
-- `GET /api/courses/{id}` — course details
-- `POST /api/courses/{courseId}/upload` — upload a PDF file for a course (ingests and stores embeddings)
-- `GET /api/courses/{courseId}/materials` — checks whether the user/course has ingested materials
-- `GET /api/topics` — list topics for authenticated user
-- `POST /api/topics` — create a topic
-- `DELETE /api/topics/{id}` — delete a topic
+## Contact & maintainers
 
-Authentication notes:
-- The app uses session-based auth. After a successful `POST /api/users/login`, the server stores the Authentication in the session and sends a `JSESSIONID` cookie to the client; the client must send that cookie on subsequent requests.
-- For testing, tests may use `@WithMockUser` to bypass real session auth.
-
----
-
-## Tests
-
-Run unit tests with:
-
-```powershell
-.\mvnw.cmd test
-```
-
-If tests fail related to Spring bean cycles or conflicting bean names, check the AI assistant/bean definitions (for example: `AiAssistant` bean double-registration) and `@Configuration` vs `@Service` annotated classes. See Troubleshooting below.
-
----
-
-## Common troubleshooting
-
-- Conflicting bean definitions (example: `Annotation-specified bean name 'aiAssistant' conflicts`): This typically happens if a bean is created twice — e.g. a `@Service` and a `@Configuration` factory both create a bean with the same name. Resolve by removing one registration or renaming the bean. The `AiAssistantConfig` class may define a bean while `AiAssistant` is annotated as a component — only one is needed.
-
-- Postgres + pgvector: If you see `extension "vector" is not available`, remove old volumes and recreate the database container so the extension package is installed fresh, or use a Postgres image that already includes `pgvector`.
-
-- Login/session 403 after login: Make sure your login flow stores the Authentication in the session (the default `HttpSessionSecurityContextRepository` is used by the Spring Security filters). The client must include the `JSESSIONID` cookie on subsequent requests. If you manually authenticate in a controller, store the security context using the configured SecurityContextRepository so subsequent requests recognize the authentication.
-
-- Avoid committing API keys: use `.env` and `spring.config.import=file:.env[.properties]` as shown above.
-
----
-
-## Embeddings and ingestion
-
-- The project stores metadata with embeddings; include `userId` and `courseId` in the metadata so that later retrieval/filtering can return only documents belonging to a particular user and course.
-- To avoid re-ingesting documents on every startup, persist embeddings in a persistent embedding store (Postgres/pgvector, or other persistent stores supported by langchain4j). See `RAGConfiguration` for how the embedding store is configured.
-- To inspect embedding store size or find how many segments/documents exist, add a small helper method in the service that queries the embedding store API for count or list of documents.
+- Project maintainer (contact): owner of this workspace
 
 
----
-
-## Contribution & conventions
-
-- Keep secrets out of the repository. Add `.env` to `.gitignore`.
-- Use the Maven wrapper to ensure consistent builds.
-- Write tests for new controllers/services and keep authentication tests isolated (create and remove users as needed during tests or use `@WithMockUser` for simpler cases).
-
----
-
-## Where to look in the code
-
-- `src/main/java/ch/frupp/lecturevault/auth` — security configuration, `UserAuthenticationProvider`, `CustomUserDetailsService`.
-- `src/main/java/ch/frupp/lecturevault/user` — data model and controller
-- `src/main/resources/application.properties` — main configuration
-- `compose.yaml` — docker compose set up for databases
-
----
-
-If anything in this README is out of date (APIs or package names changed), please update this file accordingly. If you want, I can also add an `API.md` or an OpenAPI spec file next.
-
-
-License: (add your license here)
-
-Contact: (your contact info)
-
+(End of documentation README)
