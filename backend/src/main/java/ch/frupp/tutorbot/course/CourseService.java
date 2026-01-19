@@ -1,5 +1,6 @@
 package ch.frupp.tutorbot.course;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -7,12 +8,13 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class CourseService {
 
     private final CourseRepository courseRepository;
 
-    Logger logger = LoggerFactory.getLogger(CourseService.class);
+//    Logger logger = LoggerFactory.getLogger(CourseService.class);
 
     public CourseService(CourseRepository courseRepository) {
         this.courseRepository = courseRepository;
@@ -25,9 +27,9 @@ public class CourseService {
     public List<Course> findByUserId(Integer userId) {
         var courses = courseRepository.findByUserId(userId);
         if (courses == null || courses.isEmpty()) {
-            logger.info("Found 0 courses for user with UID {}", userId);
+            log.info("Found 0 courses for user with UID {}", userId);
         } else {
-            logger.info("Found {} courses for user with UID {}. First: {}", courses.size(), userId, courses.getFirst().toString());
+            log.info("Found {} courses for user with UID {}. First: {}", courses.size(), userId, courses.getFirst().toString());
         }
         return courses;
     }
@@ -37,7 +39,7 @@ public class CourseService {
     }
 
     public Course save(Course course) {
-        logger.info("Saving course {}", course);
+        log.info("Saving course {}", course);
         return courseRepository.save(course);
     }
 

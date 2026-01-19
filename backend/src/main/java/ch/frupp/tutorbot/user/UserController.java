@@ -1,5 +1,6 @@
 package ch.frupp.tutorbot.user;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,11 +19,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class UserController {
 
-    Logger logger = LoggerFactory.getLogger(UserController.class);
+//    Logger logger = LoggerFactory.getLogger(UserController.class);
 
     @Autowired
     private UserService userService;
@@ -57,7 +59,7 @@ public class UserController {
 
             // 3) If we reach here, authentication succeeded.
             User principal = (User) authentication.getPrincipal();
-            logger.info("Login from username: {} with authorities: {}",
+            log.info("Login from username: {} with authorities: {}",
                     principal.getUsername(), authentication.getAuthorities());
 
 

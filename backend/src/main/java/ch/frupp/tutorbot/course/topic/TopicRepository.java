@@ -10,5 +10,7 @@ public interface TopicRepository extends MongoRepository<Topic, String> {
     Optional<Topic> findByUserIdAndName(Integer userId, String name);
     List<Topic> findByuserIdAndCourseId(Integer userId, String courseId);
     void deleteByUserIdAndId(Integer userId, String id);
+
+    String getDistinctFirstById(String id);
 }
 

@@ -3,6 +3,7 @@ package ch.frupp.tutorbot.course.topic.quiz;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
@@ -12,6 +13,13 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "quizzes")
 public class Quiz {
+
+    @Id
+    private String id;
+
+    private Integer userId;
+    private String topicId;
+
     private String question;
     private List<String> choices;
     private int correctAnswerIndex;
@@ -32,3 +40,5 @@ public class Quiz {
                 correctAnswerIndex >= 0 && correctAnswerIndex < 4;
     }
 }
+
+
