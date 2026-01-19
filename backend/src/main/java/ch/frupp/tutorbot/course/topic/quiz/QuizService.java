@@ -72,9 +72,9 @@ public class QuizService {
         assert topicObject != null; // TODO: Better validation and error handling
         QuizAiTemplate quizAiTemplate = aiAssistant.generateQuizQuestions(topicObject.getName(), parameters);
 
-        generatedQuiz.setQuestion(quizAiTemplate.question);
-        generatedQuiz.setChoices(quizAiTemplate.choices);
-        generatedQuiz.setCorrectAnswerIndex(quizAiTemplate.correctAnswerIndex);
+        generatedQuiz.setQuestion(quizAiTemplate.question());
+        generatedQuiz.setChoices(quizAiTemplate.choices());
+        generatedQuiz.setCorrectAnswerIndex(quizAiTemplate.correctAnswerIndex());
 
         log.info("Generated quiz: {}", generatedQuiz);
 

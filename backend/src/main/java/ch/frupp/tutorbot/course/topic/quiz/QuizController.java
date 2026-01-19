@@ -21,10 +21,8 @@ public class QuizController {
     }
 
     @PostMapping
-    public Quiz createQuiz(@PathVariable String courseId, @PathVariable String topicId, @RequestBody Quiz quiz, Authentication auth) {
+    public Quiz createQuiz(@PathVariable String courseId, @PathVariable String topicId, Authentication auth) {
         var user = (ch.frupp.tutorbot.user.User) auth.getPrincipal();
-        quiz.setUserId(user.getId());
-        quiz.setTopicId(topicId);
         return quizService.generateAndSaveQuiz(user, topicId);
     }
 }
