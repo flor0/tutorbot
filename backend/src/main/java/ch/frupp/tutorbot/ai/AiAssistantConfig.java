@@ -3,6 +3,7 @@ package ch.frupp.tutorbot.ai;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
@@ -28,6 +29,7 @@ public class AiAssistantConfig {
                 .logResponses(true)
                 .logRequests(true)
                 .build();
+
     }
 
     @Bean

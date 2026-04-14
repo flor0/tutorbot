@@ -1,10 +1,13 @@
 package ch.frupp.tutorbot.ai.dataprocessing;
 
+import ch.frupp.tutorbot.course.CourseRepository;
 import ch.frupp.tutorbot.course.material.CourseMaterial;
 import ch.frupp.tutorbot.course.material.CourseMaterialRepository;
 import ch.frupp.tutorbot.user.User;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
+import dev.langchain4j.data.document.parser.TextDocumentParser;
+import dev.langchain4j.data.document.parser.apache.pdfbox.ApachePdfBoxDocumentParser;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -24,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class PDFIngestionService {
@@ -36,11 +40,13 @@ public class PDFIngestionService {
 
     // Resolve the 'pdfs' directory relative to the application's working directory.
     private final Path pdfsDirectory = Paths.get(System.getProperty("user.dir")).resolve("pdfs");
+    private final CourseRepository courseRepository;
 
-    public PDFIngestionService(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel, CourseMaterialRepository courseMaterialRepository) {
+    public PDFIngestionService(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel, CourseMaterialRepository courseMaterialRepository, CourseRepository courseRepository) {
         this.embeddingStore = embeddingStore;
         this.embeddingModel = embeddingModel;
         this.courseMaterialRepository = courseMaterialRepository;
+        this.courseRepository = courseRepository;
     }
 
     @PostConstruct
@@ -60,7 +66,7 @@ public class PDFIngestionService {
         List<Document> documents = FileSystemDocumentLoader.loadDocuments(path);
 
         // Ingest into the embedding store (splits, embeds, and stores) with a 'system' userid
-        ingestDocuments(documents, "system", null);
+        ingestDocuments(documents, 9999, null);
     }
 
     private void clearEmbeddingStorage() {
@@ -70,11 +76,25 @@ public class PDFIngestionService {
         embeddingStore.removeAll();
     }
 
-    public IngestionResult ingestDocuments(List<Document> documents, String userId, String courseId) {
+    public IngestionResult ingestDocuments(List<Document> documents, Integer userId, Integer courseId) {
         if (documents == null || documents.isEmpty()) {
             logger.info("No documents provided for ingestion (userId={}).", userId);
             return IngestionResult.empty();
         }
+
+        List<Document> sanitizedDocuments = documents.stream()
+                .map(doc -> {
+                    if (doc == null || doc.text() == null) {
+                        return doc;
+                    }
+
+                    logger.info("DEBUG: sanitizing document: {}", doc.text());
+
+                    String cleanText = doc.text().replace("\u0000", "");
+                    if (cleanText.equals(doc.text())) return doc;
+                    return Document.from(cleanText, doc.metadata());
+                })
+                .toList();
 
         EmbeddingStoreIngestor ingestor = EmbeddingStoreIngestor.builder()
                 .documentSplitter(DocumentSplitters.recursive(300, 30))
@@ -82,16 +102,16 @@ public class PDFIngestionService {
                 .embeddingStore(embeddingStore)
                 .documentTransformer(document -> {
                     if (userId != null) {
-                        document.metadata().put("userid", userId);
+                        document.metadata().put("userid", String.valueOf(userId));
                     }
                     if (courseId != null) {
-                        document.metadata().put("courseid", courseId);
+                        document.metadata().put("courseid", String.valueOf(courseId));
                     }
                     return document;
                 })
                 .build();
 
-        dev.langchain4j.store.embedding.IngestionResult result = ingestor.ingest(documents);
+        dev.langchain4j.store.embedding.IngestionResult result = ingestor.ingest(sanitizedDocuments);
         TokenUsage usage = result.tokenUsage();
 
         Integer inputCount = usage.inputTokenCount();
@@ -104,14 +124,17 @@ public class PDFIngestionService {
         return new IngestionResult(inputCount, outputCount, totalCount);
     }
 
-    public IngestionResult ingestUploadedPdf(MultipartFile file, Integer userId, String courseId) throws IOException {
+    public IngestionResult ingestUploadedPdf(MultipartFile file, Integer userId, Integer courseId) throws IOException {
         if (file == null || file.isEmpty()) {
             logger.warn("Empty upload received for ingestion (userId={}).", userId);
             return IngestionResult.empty();
         }
 
         // Create a CourseMaterial db entry to keep track of the file
-        CourseMaterial courseMaterial = new CourseMaterial(userId, courseId, file.getOriginalFilename());
+        CourseMaterial courseMaterial = CourseMaterial.builder()
+                .filename(file.getOriginalFilename())
+                .course(courseRepository.getReferenceById(courseId))
+                .build();
         courseMaterialRepository.save(courseMaterial);
         logger.info("Course db entry created: {}", courseMaterial);
 
@@ -119,24 +142,24 @@ public class PDFIngestionService {
         Path tempFile = Files.createTempFile(tempDir, "uploaded", ".pdf");
         try {
             file.transferTo(tempFile.toFile());
-            List<Document> documents = FileSystemDocumentLoader.loadDocuments(tempDir);
+            List<Document> documents = FileSystemDocumentLoader.loadDocuments(tempDir, new ApachePdfBoxDocumentParser());
             logger.info("Course successfully ingested: {}", courseMaterial);
-            return ingestDocuments(documents, String.valueOf(userId), courseId);
+            return ingestDocuments(documents, userId, courseId);
         } finally {
             try { Files.deleteIfExists(tempDir); } catch (IOException ignored) {}
         }
     }
 
-    public List<CourseMaterial> getMaterialsByUserAndCourse(User user, String courseId) {
-        var materials = courseMaterialRepository.findByUserIdAndCourseId(user.getId(), courseId);
+    public List<CourseMaterial> getMaterialsByCourse(User user, Integer courseId) {
+        var materials = courseMaterialRepository.findByCourseId(courseId);
         logger.info("Course materials found for user {} : {}", user, materials);
-        return courseMaterialRepository.findByUserIdAndCourseId(user.getId(), courseId);
+        return materials;
     }
 
-    public void deleteMaterialById(User user, String materialId) throws Exception {
+    public void deleteMaterialById(User user, Integer materialId) throws Exception {
         CourseMaterial courseMaterial = courseMaterialRepository.findById(materialId).orElseThrow();
         // Validation: Check user owns material
-        if (user.getId() == courseMaterial.getUserId()) {
+        if (Objects.equals(user.getId(), courseMaterial.getCourse().getUser().getId())) {
             this.deleteMaterial(courseMaterial);
         } else {
             throw new Exception("The Course Material to be deleted does not belong to the user {}");
@@ -147,16 +170,15 @@ public class PDFIngestionService {
     public void deleteMaterial(CourseMaterial courseMaterial) {
 
         // Remove from the embedding store
-        String userId = String.valueOf(courseMaterial.getUserId());
-        String courseId = courseMaterial.getCourseId();
+        String userId = String.valueOf(courseMaterial.getCourse().getUser().getId());
+        String courseId = String.valueOf(courseMaterial.getCourse().getId());
         embeddingStore.removeAll(new And(
                 new IsEqualTo("userid", userId),
                 new IsEqualTo("courseid", courseId)
         ));
 
-        // Remove from the mongo db
+        // Remove from the DB
         courseMaterialRepository.delete(courseMaterial);
-
         logger.info("Course db entry and embeddings deleted: {}", courseMaterial);
 
     }
