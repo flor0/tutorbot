@@ -6,11 +6,8 @@ import {
   Button,
   Toolbar,
   Typography,
-  IconButton,
-  Menu,
-  MenuItem,
 } from '@mui/material'
-import MenuIcon from '@mui/icons-material/Menu'
+import HomeSharpIcon from '@mui/icons-material/HomeSharp';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -19,7 +16,6 @@ import Courses from './pages/Courses'
 import CourseDetail from './pages/CourseDetail'
 
 function App() {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [loggedIn, setLoggedIn] = useState<boolean>(() => {
     try {
       return Boolean(localStorage.getItem('user'))
@@ -40,11 +36,6 @@ function App() {
     window.addEventListener('authChange', handler)
     return () => window.removeEventListener('authChange', handler)
   }, [])
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget)
-  }
-  const handleMenuClose = () => setAnchorEl(null)
 
   const handleLogout = async () => {
     try {
@@ -71,7 +62,6 @@ function App() {
       }
       setLoggedIn(false)
       navigate('/login')
-      handleMenuClose()
     }
   }
 
@@ -99,7 +89,7 @@ function App() {
               ml: 1,
             }}
           >
-            AI Tutor
+            TutorBot
           </Typography>
 
           {/* Right-aligned navigation group; both nav variants are always rendered and CSS will show/hide */}
@@ -107,7 +97,7 @@ function App() {
             {/* Desktop nav - shown on wider screens via CSS */}
             <nav className="desktop-nav" aria-label="primary navigation">
               <Button color="inherit" component={Link} to="/">
-                Home
+                  <HomeSharpIcon />
               </Button>
               {!loggedIn && (
                 <>
@@ -119,9 +109,12 @@ function App() {
                   </Button>
                 </>
               )}
-              <Button color="inherit" component={Link} to="/courses">
-                Courses
-              </Button>
+
+              {loggedIn && (
+                <Button color="inherit" component={Link} to="/courses">
+                  Courses
+                </Button>
+              )}
 
               {loggedIn && (
                 <Button color="inherit" onClick={handleLogout}>
@@ -129,52 +122,6 @@ function App() {
                 </Button>
               )}
             </nav>
-
-            {/* Mobile nav - shown on small screens via CSS. The Menu still uses state to open/close. */}
-            <div className="mobile-nav">
-              <IconButton
-                color="inherit"
-                aria-label="open navigation"
-                onClick={handleMenuOpen}
-                size="large"
-              >
-                <MenuIcon />
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-              >
-                <MenuItem component={Link} to="/" onClick={handleMenuClose}>
-                  Home
-                </MenuItem>
-                {!loggedIn && (
-                  <>
-                    <MenuItem component={Link} to="/login" onClick={handleMenuClose}>
-                      Login
-                    </MenuItem>
-                    <MenuItem component={Link} to="/register" onClick={handleMenuClose}>
-                      Register
-                    </MenuItem>
-                  </>
-                )}
-                <MenuItem component={Link} to="/courses" onClick={handleMenuClose}>
-                  Courses
-                </MenuItem>
-
-                {loggedIn && (
-                  <MenuItem
-                    onClick={() => {
-                      handleLogout()
-                    }}
-                  >
-                    Logout
-                  </MenuItem>
-                )}
-              </Menu>
-            </div>
           </Box>
         </Toolbar>
       </AppBar>

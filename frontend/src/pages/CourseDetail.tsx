@@ -1,6 +1,6 @@
 import { Box, Typography, Button, ButtonGroup } from '@mui/material'
 import { useParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import CourseTopics from './CourseTopics'
 import CourseQuizzes from './CourseQuizzes'
 import CourseMaterials from './CourseMaterials'
@@ -11,6 +11,20 @@ export default function CourseDetail() {
   const [course, setCourse] = useState<{ id: string; name: string; userId?: number } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // ref to the fixed nav so we can measure its height exactly and offset content
+  const navRef = useRef<HTMLDivElement | null>(null)
+  const [navHeight, setNavHeight] = useState<number>(0)
+
+  // measure after layout so navRef.current is available; also listen for resize
+  useLayoutEffect(() => {
+    const update = () => {
+      const h = navRef.current?.clientHeight ?? 0
+      setNavHeight(h)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -117,13 +131,22 @@ export default function CourseDetail() {
           maxWidth: '100vw',
           overflowX: 'hidden',
           boxSizing: 'border-box',
+          // dynamically offset content by measured nav height, compensating for the App's outer mt:2
+          // (App wraps Routes in a Box with mt:2). This ensures content sits immediately below the nav.
+          mt: (t) => {
+            const outer = Number(String(t.spacing(2)).replace('px', '')) || 0
+            const offset = Math.max(0, navHeight - outer)
+            return `${offset}px`
+          },
           // vertical padding and responsive horizontal padding to match app spacing
           py: 2,
           px: { xs: '0.75rem', sm: '2rem' },
         }}
         aria-label={'course detail content'}
       >
-        <Typography variant="h4">{course?.name ?? (loading ? 'Loading…' : 'Course')}</Typography>
+        <Typography variant="h4" sx={{ textAlign: 'left', ml: 0 }}>
+          {course?.name ?? (loading ? 'Loading…' : 'Course')}
+        </Typography>
         {error && (
           <Typography variant="body2" color="error" sx={{ mt: 1 }}>
             {error}

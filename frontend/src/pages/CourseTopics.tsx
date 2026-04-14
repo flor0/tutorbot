@@ -1,5 +1,6 @@
-import { Paper, Typography, Stack, Box, TextField, Button, IconButton, List, ListItem, ListItemText, ListItemButton, CircularProgress, Alert } from '@mui/material'
+import { Paper, Typography, Stack, Box, TextField, Button, IconButton, List, ListItem, ListItemText, ListItemButton, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Fab } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
+import AddIcon from '@mui/icons-material/Add'
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -19,6 +20,7 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
   const [createError, setCreateError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
+  const [dialogOpen, setDialogOpen] = useState(false)
   const navigate = useNavigate()
   const params = useParams()
   const courseId = propCourseId ?? params.courseId
@@ -73,14 +75,15 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
     setSelectedSummary(t?.summary ?? '')
   }, [selectedTopicId, topics])
 
-  const handleCreate = useCallback(async () => {
-    if (!name.trim()) return
+  // return true on success so callers (dialog) can close
+  const handleCreate = useCallback(async (): Promise<boolean> => {
+    if (!name.trim()) return false
     setCreateError(null)
     setCreating(true)
     try {
       if (!courseId) {
         setCreateError('Missing courseId')
-        return
+        return false
       }
       const body = { name: name.trim() }
       const res = await fetch(`/api/courses/${encodeURIComponent(courseId)}/topics`, {
@@ -93,24 +96,26 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
         try { localStorage.removeItem('user') } catch (e) { void e }
         try { window.dispatchEvent(new Event('authChange')) } catch (e) { void e }
         navigate('/login')
-        return
+        return false
       }
       if (res.status === 409) {
         const t = await res.text().catch(() => '')
         setCreateError(t || 'Topic with this name already exists')
-        return
+        return false
       }
       if (!res.ok) {
         const t = await res.text().catch(() => '')
         setCreateError(t || `Create failed: HTTP ${res.status}`)
-        return
+        return false
       }
       // created, refresh
       setName('')
       await loadTopics()
+      return true
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setCreateError(msg || 'Failed to create topic')
+      return false
     } finally {
       setCreating(false)
     }
@@ -161,16 +166,11 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
   }
 
   return (
-    <Paper sx={{ p: 2 }} elevation={1}>
+    <Paper sx={{ p: 2, width: '100%', maxWidth: '100%', ml: 0 }} elevation={1}>
       <Typography variant="h6">Topics</Typography>
 
       <Box sx={{ mt: 2 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
-          <TextField label="New topic" value={name} onChange={(e) => setName(e.target.value)} size="small" sx={{ flex: 1 }} />
-          <Button variant="contained" onClick={() => void handleCreate()} disabled={!name.trim() || creating}>
-            {creating ? <CircularProgress size={18} /> : 'Create'}
-          </Button>
-        </Stack>
+        {/* Creation is now handled via the floating action button + dialog */}
         {createError && <Alert severity="error" sx={{ mt: 1 }}>{createError}</Alert>}
       </Box>
 
@@ -179,15 +179,15 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
         {error && <Alert severity="error">{error}</Alert>}
 
         {!loading && !error && topics && (
-          <List>
+          <List sx={{ pl: 0 }}>
             {topics.map((t) => (
               <ListItem key={t.id} disablePadding secondaryAction={
                 <IconButton edge="end" aria-label={`delete ${t.name}`} onClick={() => void handleDelete(t.id)} disabled={deletingIds[t.id]}>
                   <DeleteIcon />
                 </IconButton>
               }>
-                <ListItemButton selected={t.id === selectedTopicId} onClick={() => handleSelect(t)}>
-                  <ListItemText primary={t.name} />
+                <ListItemButton selected={t.id === selectedTopicId} onClick={() => handleSelect(t)} sx={{ textAlign: 'left' }}>
+                  <ListItemText primary={t.name} primaryTypographyProps={{ align: 'left' }} />
                 </ListItemButton>
               </ListItem>
             ))}
@@ -215,6 +215,50 @@ export default function CourseTopics({ courseId: propCourseId }: { courseId?: st
           />
         </Paper>
       </Box>
+
+      {/* Dialog for creating a new topic */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Create topic</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Topic name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              fullWidth
+              disabled={creating}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void (async () => {
+                    const ok = await handleCreate()
+                    if (ok) setDialogOpen(false)
+                  })()
+                }
+              }}
+            />
+            {createError && <Alert severity="error">{createError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)} disabled={creating}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              const ok = await handleCreate()
+              if (ok) setDialogOpen(false)
+            }}
+            variant="contained"
+            disabled={!name.trim() || creating}
+          >
+            {creating ? <CircularProgress size={18} /> : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Fab color="primary" aria-label="create-topic" onClick={() => { setName(''); setCreateError(null); setDialogOpen(true) }} sx={{ position: 'fixed', bottom: 24, right: 24 }}>
+        <AddIcon />
+      </Fab>
     </Paper>
   )
 }
