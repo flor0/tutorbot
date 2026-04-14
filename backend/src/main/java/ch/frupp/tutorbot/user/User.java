@@ -1,13 +1,22 @@
 package ch.frupp.tutorbot.user;
 
+import ch.frupp.tutorbot.course.Course;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 @Entity
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@Setter
 @Table(name = "users")
 public class User implements UserDetails {
 
@@ -18,7 +27,7 @@ public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Integer id;
 
     @Column(unique = true, nullable = false)
     private String username;
@@ -32,6 +41,10 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String role = "USER"; // "USER" or "ADMIN" for now
 
+    // A User owns multiple Courses
+    @JsonIgnore
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Course> courses = new ArrayList<>();
 
     // Ensure defaults if code sets null before persist
     @PrePersist
@@ -39,22 +52,5 @@ public class User implements UserDetails {
         if (enabled == null) enabled = true;
         if (role == null) role = "USER";
     }
-
-
-    // Getters and setters
-    public int getId() { return id;}
-    public void setId(int id) { this.id = id; }
-
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public Boolean getEnabled() { return enabled; }
-    public void setEnabled(Boolean enabled) { this.enabled = enabled; }
-
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
 
 }

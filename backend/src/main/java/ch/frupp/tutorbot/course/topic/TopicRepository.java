@@ -1,16 +1,10 @@
 package ch.frupp.tutorbot.course.topic;
 
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.Optional;
 
-public interface TopicRepository extends MongoRepository<Topic, String> {
-    List<Topic> findAllByUserId(Integer userId);
-    Optional<Topic> findByUserIdAndName(Integer userId, String name);
-    List<Topic> findByuserIdAndCourseId(Integer userId, String courseId);
-    void deleteByUserIdAndId(Integer userId, String id);
-
-    String getDistinctFirstById(String id);
+public interface TopicRepository extends JpaRepository<Topic, Integer> {
+    List<Topic> findByCourseId(Integer courseId);
 }
 

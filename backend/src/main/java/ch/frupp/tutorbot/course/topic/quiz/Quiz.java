@@ -1,28 +1,40 @@
 package ch.frupp.tutorbot.course.topic.quiz;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import ch.frupp.tutorbot.course.topic.Topic;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
+
 
 import java.util.List;
 
-@Data
+@Entity
+@Table(name = "quizzes")
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "quizzes")
+@Getter
+@Setter
 public class Quiz {
 
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
-    private Integer userId;
-    private String topicId;
-
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
+
+    @ElementCollection(fetch = FetchType.EAGER)
     private List<String> choices;
+
+    @Column(nullable = false)
     private int correctAnswerIndex;
+
+    // A Quiz is owned by a Topic
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY,  optional = false)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
 
     @Override
     public String toString() {

@@ -1,42 +1,45 @@
 package ch.frupp.tutorbot.course.topic;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.mapping.Document;
+import ch.frupp.tutorbot.course.Course;
+import ch.frupp.tutorbot.course.topic.quiz.Quiz;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Data
+
+@Entity
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "topics")
-@CompoundIndex(def = "{ 'userId' : 1, 'name' : 1 }", unique = true)
+@Getter
+@Setter
+@Table(name = "topics")
 public class Topic {
 
     @Id
-    private String id;
-
-    // Owner user id (store as string to be generic across JPA vs other ids)
-    private Integer userId;
-
-    private String courseId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     // A short machine-friendly name / keyword for the topic, e.g. "Integrals"
+    @Column(unique = true, nullable = false)
     private String name;
 
     // A short summary describing the topic
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String summary;
 
-    // References to quizzes related to this topic (store quiz document ids)
-    private List<String> quizIds;
+    // A Topic owns multiple Quizzes
+    @JsonIgnore
+    @OneToMany(mappedBy = "topic", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Quiz> quizzes = new ArrayList<>();
 
-    // Convenience method to add a quiz id
-    public void addQuizId(String quizId) {
-        if (this.quizIds == null) this.quizIds = new ArrayList<>();
-        this.quizIds.add(quizId);
-    }
+    // A Topic is owned by a Course
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
 }

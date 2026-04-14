@@ -1,25 +1,46 @@
 package ch.frupp.tutorbot.course;
 
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import ch.frupp.tutorbot.course.material.CourseMaterial;
+import ch.frupp.tutorbot.course.topic.Topic;
+import ch.frupp.tutorbot.user.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 
-@Data
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Builder
 @NoArgsConstructor
-@Document(collection = "courses")
+@AllArgsConstructor
+@Getter
+@Setter
+@Table(name = "courses")
 public class Course {
 
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
 
+    @Column(nullable = false)
     private String name;
 
-    private Integer userId;
+    // A Course owns multiple CourseMaterials
+    @JsonIgnore
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<CourseMaterial> materials = new ArrayList<>();
 
-    public Course(Integer userId, String name) { this.userId = userId; this.name = name; }
+    // A Course owns multiple Topics
+    @JsonIgnore
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Topic> topics = new ArrayList<>();
 
-    public String toString() { return "Course{id=" + id + ", name='" + name + "', userId=" + userId + "}"; }
+    // A Course belongs to a User
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
 }

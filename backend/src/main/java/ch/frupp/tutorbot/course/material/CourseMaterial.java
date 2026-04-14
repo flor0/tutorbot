@@ -1,33 +1,30 @@
 package ch.frupp.tutorbot.course.material;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.index.Indexed;
+import ch.frupp.tutorbot.course.Course;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 
-@Document(collection = "coursematerials")
+@Entity
+@Table(name = "course_materials")
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Getter
+@Setter
 public class CourseMaterial {
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
-    @Indexed
-    private Integer userId;
-
-    @Indexed
-    private String courseId;
-
+    @Column(nullable = false, length = 255)
     private String filename;
 
-    public CourseMaterial(Integer userId, String courseId, String filename) {
-        this.userId = userId;
-        this.courseId = courseId;
-        this.filename = filename;
-    }
+    // A CourseMaterial (PDF) belongs to a Course
+    @JsonIgnore
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id")
+    private Course course;
 
 }
 
