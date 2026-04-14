@@ -18,7 +18,7 @@ public class DefaultUserInitializer {
     @Value("${app.default-user.username:florian}")
     private String defaultUsername;
 
-    @Value("${app.default-user.password:verystrongpasswordforproduction}")
+    @Value("${app.default-user.password:admin}")
     private String defaultPassword;
 
     @Value("${app.default-user.role:ADMIN}")
@@ -34,12 +34,14 @@ public class DefaultUserInitializer {
         userRepository.findByUsername(defaultUsername).ifPresentOrElse(u -> {
             logger.info("Default user '{}' already exists, skipping creation", defaultUsername);
         }, () -> {
-            User u = new User();
-            u.setUsername(defaultUsername);
-            u.setPassword(passwordEncoder.encode(defaultPassword));
-            u.setRole(defaultRole);
-            u.setEnabled(true);
-            userRepository.save(u);
+            userRepository.save(
+                    User.builder()
+                            .username(defaultUsername)
+                            .password(passwordEncoder.encode(defaultPassword))
+                            .role(defaultRole)
+                            .enabled(true)
+                            .build()
+            );
             logger.info("Created default user '{}' with role {}", defaultUsername, defaultRole);
         });
     }

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -26,14 +27,20 @@ public class QuizService {
         this.topicRepository = topicRepository;
     }
 
-    public Optional<List<Quiz>> getAllQuizzesByUserAndTopicId(User user, String topicId) {
-
-        List<Quiz> quizzes = quizRepository.findAllByUserIdAndTopicId(user.getId(), topicId);
+    public Optional<List<Quiz>> getAllQuizzesByUserAndTopicId(User user, Integer topicId) {
+        // TODO: Validate user ownership
+        List<Quiz> quizzes = quizRepository.findAllByTopicId(topicId);
         log.info("Found {} quizzes for user {} and topic {}", quizzes.size(), user.getId(), topicId);
+
+        // Remove and log quizzes not owned by the user
+        quizzes.stream().filter(quiz -> !validateQuizOwnership(user, quiz)).forEach(quiz -> {
+            log.warn("Quiz with ID {} does not belong to user {} and will be removed from the response", quiz.getId(), user.getId());
+            quizzes.remove(quiz);
+        });
+
         if (!quizzes.isEmpty()) {
             return Optional.of(quizzes);
         }
-
         return Optional.empty();
     }
 
@@ -48,34 +55,32 @@ public class QuizService {
         return quizRepository.save(quiz);
     }
 
-    public void deleteQuizById(String quizId) {
+    public void deleteQuizById(Integer quizId) {
         quizRepository.deleteById(quizId);
     }
 
     private boolean validateQuizOwnership(User user, Quiz quiz) {
-        return user.getId() == quiz.getUserId();
+        Integer dbUserId = quiz.getTopic().getCourse().getUser().getId();
+        return Objects.equals(user.getId(), dbUserId);
     }
 
-    public Quiz generateAndSaveQuiz(User user, String topicId) {
+    public Quiz generateAndSaveQuiz(User user, Integer topicId) {
 
-        Quiz generatedQuiz = new Quiz();
-        generatedQuiz.setUserId(user.getId());
-        generatedQuiz.setTopicId(topicId);
+        // get the Topic that owns the Quiz
+        Topic topic = topicRepository.getReferenceById(topicId);
 
+        // Create an AI template for the prompt
         InvocationParameters parameters = InvocationParameters.from(Map.of(
                 "userid", String.valueOf(user.getId())
 //                "courseid", ...
         ));
-
-        // Get the name of the topic for quiz generation
-        Topic topicObject = topicRepository.findById(topicId).orElse(null);
-        assert topicObject != null; // TODO: Better validation and error handling
-        QuizAiTemplate quizAiTemplate = aiAssistant.generateQuizQuestions(topicObject.getName(), parameters);
-
-        generatedQuiz.setQuestion(quizAiTemplate.question());
-        generatedQuiz.setChoices(quizAiTemplate.choices());
-        generatedQuiz.setCorrectAnswerIndex(quizAiTemplate.correctAnswerIndex());
-
+        QuizAiTemplate aiTemplate = aiAssistant.generateQuizQuestions(topic.getName(), parameters);
+        Quiz generatedQuiz = Quiz.builder()
+                .question(aiTemplate.question())
+                .choices(aiTemplate.choices())
+                .correctAnswerIndex(aiTemplate.correctAnswerIndex())
+                .topic(topic)
+                .build();
         log.info("Generated quiz: {}", generatedQuiz);
 
         return quizRepository.save(generatedQuiz);

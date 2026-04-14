@@ -29,14 +29,14 @@ public class CourseMaterialController {
 
 
     @GetMapping("/{courseId}/materials")
-    public ResponseEntity<List<CourseMaterial>> findAllByCourseId(@PathVariable String courseId, Authentication authentication) {
+    public ResponseEntity<List<CourseMaterial>> findAllByCourseId(@PathVariable Integer courseId, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        List<CourseMaterial> materials = ingestionService.getMaterialsByUserAndCourse(user, courseId);
+        List<CourseMaterial> materials = ingestionService.getMaterialsByCourse(user, courseId);
         return ResponseEntity.ofNullable(materials);
     }
 
     @PostMapping(path = "/{courseId}/materials/upload", consumes = {"multipart/form-data"})
-    public ResponseEntity<?> uploadPdf(@PathVariable String courseId, @RequestParam("file") MultipartFile file, Authentication authentication) {
+    public ResponseEntity<?> uploadPdf(@PathVariable Integer courseId, @RequestParam("file") MultipartFile file, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         Integer userId = user.getId();
 
@@ -55,7 +55,7 @@ public class CourseMaterialController {
     }
 
     @DeleteMapping("/{courseId}/materials/{materialId}")
-    public ResponseEntity<?> deleteMaterial(@PathVariable String courseId, @PathVariable String materialId, Authentication authentication) {
+    public ResponseEntity<?> deleteMaterial(@PathVariable Integer courseId, @PathVariable Integer materialId, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         Integer userId = user.getId();
         // Fetch the relevant CourseMaterial for deletion from the repository

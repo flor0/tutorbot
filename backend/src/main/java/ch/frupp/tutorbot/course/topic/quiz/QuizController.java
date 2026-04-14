@@ -15,13 +15,13 @@ public class QuizController {
     }
 
     @GetMapping
-    public List<Quiz> getQuizzes(@PathVariable String courseId, @PathVariable String topicId, Authentication auth) {
+    public List<Quiz> getQuizzes(@PathVariable Integer courseId, @PathVariable Integer topicId, Authentication auth) {
         var user = (ch.frupp.tutorbot.user.User) auth.getPrincipal();
         return quizService.getAllQuizzesByUserAndTopicId(user, topicId).orElse(List.of());
     }
 
     @PostMapping
-    public Quiz createQuiz(@PathVariable String courseId, @PathVariable String topicId, Authentication auth) {
+    public Quiz createQuiz(@PathVariable Integer courseId, @PathVariable Integer topicId, Authentication auth) {
         var user = (ch.frupp.tutorbot.user.User) auth.getPrincipal();
         return quizService.generateAndSaveQuiz(user, topicId);
     }

@@ -24,29 +24,28 @@ public class TopicController {
     }
 
     @GetMapping
-    public List<TopicDto> listTopics(Authentication authentication, @PathVariable String courseId) {
+    public List<TopicDto> listTopics(Authentication authentication, @PathVariable Integer courseId) {
         User user = (User) authentication.getPrincipal();
         return topicService.listTopicsForUserAndCourse(user, courseId).stream()
-                .map(TopicDto::from)
+                .map(TopicDto::fromTopic)
                 .collect(Collectors.toList());
     }
 
     @PostMapping
-    public ResponseEntity<?> createTopic(Authentication authentication, @RequestBody TopicDto dto, @PathVariable String courseId) {
+    public ResponseEntity<?> createTopic(Authentication authentication, @RequestBody TopicDto dto, @PathVariable Integer courseId) {
         User user = (User) authentication.getPrincipal();
-        Topic topic = dto.toTopic();
         try {
-            Topic created = topicService.createTopicForUser(user, topic, courseId);
+            Topic created = topicService.createTopicForUser(user, dto, courseId);
             logger.info("Created topic for user {} with id {}", user, created.getId());
-            return ResponseEntity.ok(TopicDto.from(created));
+            return ResponseEntity.ok(TopicDto.fromTopic(created));
         } catch (DuplicateKeyException ex) {
-            logger.warn("Duplicate topic for user {}: {}", user, dto.name);
+            logger.warn("Duplicate topic for user {}: {}", user, dto.name());
             return ResponseEntity.status(409).body("Topic with this name already exists");
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteTopic(Authentication authentication, @PathVariable String id, @PathVariable String courseId) {
+    public ResponseEntity<?> deleteTopic(Authentication authentication, @PathVariable Integer id, @PathVariable Integer courseId) {
         User user = (User) authentication.getPrincipal();
         topicService.deleteTopicForUser(user, id);
         return ResponseEntity.noContent().build();

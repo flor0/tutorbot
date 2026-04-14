@@ -17,13 +17,11 @@ public class SummaryService {
         this.aiAssistant = aiAssistant;
     }
 
-    public Topic addSummary(Topic topic, User user) {
+    public String generateSummary(String topicName, User user) {
         InvocationParameters parameters = InvocationParameters.from(Map.of(
                 "userid", String.valueOf(user.getId())
 //                "courseid", ...
         ));
-        String summary = aiAssistant.summarizeTopic(topic.getName(), parameters);
-        topic.setSummary(summary);
-        return topic;
+        return aiAssistant.summarizeTopic(topicName, parameters);
     }
 }

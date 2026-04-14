@@ -38,7 +38,7 @@ public class UserController {
 
     // Property to enable/disable registration. Default true so tests that construct the controller manually still pass.
     @Value("${app.allow-registration:true}")
-    private boolean allowRegistration = false;
+    private boolean allowRegistration = true;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request,

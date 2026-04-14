@@ -25,7 +25,7 @@ public class CourseController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Course> findById(@PathVariable String id) {
+    public ResponseEntity<Course> findById(@PathVariable int id) {
         return courseService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -35,18 +35,17 @@ public class CourseController {
     public Course create(@RequestBody CourseDto course, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         Integer userId = user.getId();
-        return courseService.save(new Course(
-                userId,
-                course.name()
-        ));
+        return courseService.save(Course.builder()
+                .user(user)
+                .name(course.name())
+                .build());
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id, Authentication authentication) {
+    public void delete(@PathVariable Integer id, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        Integer userId = user.getId();
 
-        courseService.deleteByIdAndUserId(id, userId);
+        courseService.deleteByIdAndUserId(id, user);
     }
 
 }

@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class CourseControllerTest {
+class   CourseControllerTest {
 
     private MockMvc mockMvc;
     private CourseService courseService;
@@ -33,10 +33,15 @@ class CourseControllerTest {
         User principal = new User();
         principal.setId(123);
 
-        Course c1 = new Course(123, "Course A");
-        c1.setId("1");
-        Course c2 = new Course(123, "Course B");
-        c2.setId("2");
+        Course c1 = new Course();
+        c1.setId(1);
+        c1.setUser(principal);
+        c1.setName("Course A");
+
+        Course c2 = new Course();
+        c2.setId(2);
+        c2.setUser(principal);
+        c2.setName("Course B");
 
         Mockito.when(courseService.findByUserId(123)).thenReturn(List.of(c1, c2));
 
@@ -51,8 +56,10 @@ class CourseControllerTest {
         User principal = new User();
         principal.setId(123);
 
-        Course returned = new Course(123, "New Course");
-        returned.setId("99");
+        Course returned = new Course();
+        returned.setId(99);
+        returned.setUser(principal);
+        returned.setName("New Course");
 
         Mockito.when(courseService.save(Mockito.any(Course.class))).thenReturn(returned);
 
@@ -64,6 +71,6 @@ class CourseControllerTest {
                         .principal(new UsernamePasswordAuthenticationToken(principal, null)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("New Course"))
-                .andExpect(jsonPath("$.id").value("99"));
+                .andExpect(jsonPath("$.id").value(99));
     }
 }
