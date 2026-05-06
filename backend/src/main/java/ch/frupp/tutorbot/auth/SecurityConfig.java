@@ -1,5 +1,6 @@
 package ch.frupp.tutorbot.auth;
 
+import ch.frupp.tutorbot.auth.demo.DemoReadOnlyFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,6 +14,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.logout.HeaderWriterLogoutHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -46,7 +48,8 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider,
-                                           SecurityContextRepository securityContextRepository) throws Exception {
+                                           SecurityContextRepository securityContextRepository,
+                                           DemoReadOnlyFilter demoReadOnlyFilter) throws Exception {
 
         http.csrf(AbstractHttpConfigurer::disable);
         http.authorizeHttpRequests(auth ->
@@ -58,6 +61,8 @@ public class SecurityConfig {
 
         // Use the injected repository
         http.securityContext(ctx -> ctx.securityContextRepository(securityContextRepository));
+
+        http.addFilterBefore(demoReadOnlyFilter, AuthorizationFilter.class);
 
         http.sessionManagement(session -> {
                 session.maximumSessions(1).maxSessionsPreventsLogin(true);
